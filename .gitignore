@@ -1,3 +1,4 @@
 config.ini
 python_client.log
 api_keys.json
+__pycache__/
