@@ -1,6 +1,15 @@
-# portfolio-insight
+# (WIP) portfolio-insight
+Based on etrade Python SDK. The app has 2 modules:
+Module 1:
+- Takes in a target portfolio allocation (either via text input, or an image of a portfolio)
+- Takes in an investment amount
+- Outputs the stocks/securities that the user should invest in with the above amount to maintain/get closer to target allocation
 
-A Python-based portfolio analysis and insight tool.
+Module 2:
+The goal of module 2 is to help a user identify/iterate on their portfolio allocation. For a given portfolio allocation (again, either via text input, or image), it should:
+- Do a backtest of the portfolio over a configurable time-period, and output metrics like growth rate, max drawdown, asset correlations, and any others you deem fit
+- It should allow users to tweak the allocation slightly and re-generate metrics
+- Includes a chat button for users to ask an LLMs to recommend sample portfolios, and then refresh metrics
 
 ## Development Setup
 
@@ -56,9 +65,3 @@ To run hooks manually on all files:
 ```bash
 pre-commit run --all-files
 ```
-
-### Dependencies
-
-- `rauth`: OAuth 1.0/2.0 authentication library for API access
-- `black`: Code formatter (development dependency)
-- `pre-commit`: Pre-commit hooks framework (development dependency)
