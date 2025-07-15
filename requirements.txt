@@ -1,0 +1,6 @@
+# Core dependencies for portfolio-insight
+rauth>=0.7.0
+
+# Development dependencies
+black>=22.0.0
+pre-commit>=2.15.0
