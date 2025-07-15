@@ -21,21 +21,27 @@ logger.addHandler(handler)
 
 class Order:
 
-    def __init__(self, session, account, base_url):
+    def __init__(self, session, base_url):
         self.session = session
-        self.account = account
         self.base_url = base_url
+        self.account = {}
 
-    def preview_order(self):
+    def set_account(self, account):
         """
-        Call preview order API based on selecting from different given options
-
-        :param self: Pass in authenticated session and information on selected account
+        Set the account for order operations
+        :param account: Account dictionary with accountIdKey and other details
         """
+        self.account = account
 
+    def preview_order(self, order_params):
+        """
+        Call preview order API based on provided order parameters
 
-        # User's order selection
-        order = self.user_select_order()
+        :param order_params: Dictionary containing order parameters
+        :return: Dictionary containing preview order response or None if error
+        """
+        if not order_params:
+            return None
 
         # URL for the API endpoint
         url = self.base_url + "/v1/accounts/" + self.account["accountIdKey"] + "/orders/preview.json"
@@ -65,8 +71,8 @@ class Order:
                            </Instrument>
                        </Order>
                    </PreviewOrderRequest>"""
-        payload = payload.format(order["client_order_id"], order["price_type"], order["order_term"],
-                                 order["limit_price"], order["symbol"], order["order_action"], order["quantity"])
+        payload = payload.format(order_params["client_order_id"], order_params["price_type"], order_params["order_term"],
+                                 order_params["limit_price"], order_params["symbol"], order_params["order_action"], order_params["quantity"])
 
         # Make API call for POST request
         response = self.session.post(url, header_auth=True, headers=headers, data=payload)
@@ -78,716 +84,249 @@ class Order:
             parsed = json.loads(response.text)
             logger.debug("Response Body: %s", json.dumps(parsed, indent=4, sort_keys=True))
             data = response.json()
-            print("\nPreview Order:")
+            
+            result = {"success": True, "preview_data": {}}
 
             if data is not None and "PreviewOrderResponse" in data and "PreviewIds" in data["PreviewOrderResponse"]:
+                result["preview_data"]["preview_ids"] = []
                 for previewids in data["PreviewOrderResponse"]["PreviewIds"]:
-                    print("Preview ID: " + str(previewids["previewId"]))
-            else:
-                # Handle errors
-                data = response.json()
-                if 'Error' in data and 'message' in data["Error"] and data["Error"]["message"] is not None:
-                    print("Error: " + data["Error"]["message"])
-                else:
-                    print("Error: Preview Order API service error")
+                    result["preview_data"]["preview_ids"].append(previewids["previewId"])
 
             if data is not None and "PreviewOrderResponse" in data and "Order" in data["PreviewOrderResponse"]:
+                result["preview_data"]["orders"] = []
                 for orders in data["PreviewOrderResponse"]["Order"]:
-                    order["limitPrice"] = orders["limitPrice"]
-
+                    order_details = {}
+                    if "limitPrice" in orders:
+                        order_details["limitPrice"] = orders["limitPrice"]
+                    if "priceType" in orders:
+                        order_details["priceType"] = orders["priceType"]
+                    if "orderTerm" in orders:
+                        order_details["orderTerm"] = orders["orderTerm"]
+                    if "estimatedCommission" in orders:
+                        order_details["estimatedCommission"] = orders["estimatedCommission"]
+                    if "estimatedTotalAmount" in orders:
+                        order_details["estimatedTotalAmount"] = orders["estimatedTotalAmount"]
+                    
                     if orders is not None and "Instrument" in orders:
+                        order_details["instruments"] = []
                         for instrument in orders["Instrument"]:
+                            inst_details = {}
                             if instrument is not None and "orderAction" in instrument:
-                                print("Action: " + instrument["orderAction"])
+                                inst_details["orderAction"] = instrument["orderAction"]
                             if instrument is not None and "quantity" in instrument:
-                                print("Quantity: " + str(instrument["quantity"]))
+                                inst_details["quantity"] = instrument["quantity"]
                             if instrument is not None and "Product" in instrument \
                                     and "symbol" in instrument["Product"]:
-                                print("Symbol: " + instrument["Product"]["symbol"])
+                                inst_details["symbol"] = instrument["Product"]["symbol"]
                             if instrument is not None and "symbolDescription" in instrument:
-                                print("Description: " + str(instrument["symbolDescription"]))
-
-                if orders is not None and "priceType" in orders and "limitPrice" in orders:
-                    print("Price Type: " + orders["priceType"])
-                    if orders["priceType"] == "MARKET":
-                        print("Price: MKT")
-                    else:
-                        print("Price: " + str(orders["limitPrice"]))
-                if orders is not None and "orderTerm" in orders:
-                    print("Duration: " + orders["orderTerm"])
-                if orders is not None and "estimatedCommission" in orders:
-                    print("Estimated Commission: " + str(orders["estimatedCommission"]))
-                if orders is not None and "estimatedTotalAmount" in orders:
-                    print("Estimated Total Cost: " + str(orders["estimatedTotalAmount"]))
-            else:
-                # Handle errors
-                data = response.json()
-                if 'Error' in data and 'message' in data["Error"] and data["Error"]["message"] is not None:
-                    print("Error: " + data["Error"]["message"])
-                else:
-                    print("Error: Preview Order API service error")
+                                inst_details["symbolDescription"] = instrument["symbolDescription"]
+                            order_details["instruments"].append(inst_details)
+                    result["preview_data"]["orders"].append(order_details)
+            
+            return result
         else:
             # Handle errors
             data = response.json()
+            error_msg = "Preview Order API service error"
             if 'Error' in data and 'message' in data["Error"] and data["Error"]["message"] is not None:
-                print("Error: " + data["Error"]["message"])
-            else:
-                print("Error: Preview Order API service error")
+                error_msg = data["Error"]["message"]
+            logger.debug("Preview Order error: %s", error_msg)
+            return {"success": False, "error": error_msg}
 
-    def previous_order(self, session, account, prev_orders):
+
+    def parse_orders(self, response, status):
         """
-        Calls preview order API based on a list of previous orders
-
-        :param session: authenticated session
-        :param account: information on selected account
-        :param prev_orders: list of instruments from previous orders
-        """
-
-        if prev_orders is not None:
-            while True:
-
-                # Display previous instruments for user selection
-                print("")
-                count = 1
-                for order in prev_orders:
-                    print(str(count) + ")\tOrder Action: " + order["order_action"] + " | "
-                          + "Security Type: " + str(order["security_type"]) + " | "
-                          + "Term: " + str(order["order_term"]) + " | "
-                          + "Quantity: " + str(order["quantity"]) + " | "
-                          + "Symbol: " + order["symbol"] + " | "
-                          + "Price Type: " + order["price_type"])
-                    count = count + 1
-                print(str(count) + ")\t" "Go Back")
-                options_select = input("Please select an option: ")
-
-                if options_select.isdigit() and 0 < int(options_select) < len(prev_orders) + 1:
-
-                    # URL for the API endpoint
-                    url = self.base_url + "/v1/accounts/" + account["accountIdKey"] + "/orders/preview.json"
-
-                    # Add parameters and header information
-                    headers = {"Content-Type": "application/xml", "consumerKey": config["DEFAULT"]["CONSUMER_KEY"]}
-
-                    # Add payload for POST Request
-                    payload = """<PreviewOrderRequest>
-                                   <orderType>{0}</orderType>
-                                   <clientOrderId>{1}</clientOrderId>
-                                   <Order>
-                                       <allOrNone>false</allOrNone>
-                                       <priceType>{2}</priceType>  
-                                       <orderTerm>{3}</orderTerm>   
-                                       <marketSession>REGULAR</marketSession>
-                                       <stopPrice></stopPrice>
-                                       <limitPrice>{4}</limitPrice>
-                                       <Instrument>
-                                           <Product>
-                                               <securityType>{5}</securityType>
-                                               <symbol>{6}</symbol>
-                                           </Product>
-                                           <orderAction>{7}</orderAction> 
-                                           <quantityType>QUANTITY</quantityType>
-                                           <quantity>{8}</quantity>
-                                       </Instrument>
-                                   </Order>
-                               </PreviewOrderRequest>"""
-
-                    options_select = int(options_select)
-                    prev_orders[options_select - 1]["client_order_id"] = str(random.randint(1000000000, 9999999999))
-                    payload = payload.format(prev_orders[options_select - 1]["order_type"],
-                                             prev_orders[options_select - 1]["client_order_id"],
-                                             prev_orders[options_select - 1]["price_type"],
-                                             prev_orders[options_select - 1]["order_term"],
-                                             prev_orders[options_select - 1]["limitPrice"],
-                                             prev_orders[options_select - 1]["security_type"],
-                                             prev_orders[options_select - 1]["symbol"],
-                                             prev_orders[options_select - 1]["order_action"],
-                                             prev_orders[options_select - 1]["quantity"])
-
-                    # Make API call for POST request
-                    response = session.post(url, header_auth=True, headers=headers, data=payload)
-                    logger.debug("Request Header: %s", response.request.headers)
-                    logger.debug("Request payload: %s", payload)
-
-                    # Handle and parse response
-                    if response is not None and response.status_code == 200:
-                        parsed = json.loads(response.text)
-                        logger.debug("Response Body: %s", json.dumps(parsed, indent=4, sort_keys=True))
-                        data = response.json()
-                        print("\nPreview Order: ")
-                        if data is not None and "PreviewOrderResponse" in data and "PreviewIds" in data["PreviewOrderResponse"]:
-                            for previewids in data["PreviewOrderResponse"]["PreviewIds"]:
-                                print("Preview ID: " + str(previewids["previewId"]))
-                        else:
-                            # Handle errors
-                            data = response.json()
-                            if 'Error' in data and 'message' in data["Error"] and data["Error"]["message"] is not None:
-                                print("Error: " + data["Error"]["message"])
-                            else:
-                                print("Error: Preview Order API service error")
-
-                        if data is not None and "PreviewOrderResponse" in data and "Order" in data[
-                            "PreviewOrderResponse"]:
-                            for orders in data["PreviewOrderResponse"]["Order"]:
-                                prev_orders[options_select - 1]["limitPrice"] = orders["limitPrice"]
-
-                                if orders is not None and "Instrument" in orders:
-                                    for instruments in orders["Instrument"]:
-                                        if instruments is not None and "orderAction" in instruments:
-                                            print("Action: " + instruments["orderAction"])
-                                        if instruments is not None and "quantity" in instruments:
-                                            print("Quantity: " + str(instruments["quantity"]))
-                                        if instruments is not None and "Product" in instruments \
-                                                and "symbol" in instruments["Product"]:
-                                            print("Symbol: " + instruments["Product"]["symbol"])
-                                        if instruments is not None and "symbolDescription" in instruments:
-                                            print("Description: " + str(instruments["symbolDescription"]))
-
-                            if orders is not None and "priceType" in orders and "limitPrice" in orders:
-                                print("Price Type: " + orders["priceType"])
-                                if orders["priceType"] == "MARKET":
-                                    print("Price: MKT")
-                                else:
-                                    print("Price: " + str(orders["limitPrice"]))
-                            if orders is not None and "orderTerm" in orders:
-                                print("Duration: " + orders["orderTerm"])
-                            if orders is not None and "estimatedCommission" in orders:
-                                print("Estimated Commission: " + str(orders["estimatedCommission"]))
-                            if orders is not None and "estimatedTotalAmount" in orders:
-                                print("Estimated Total Cost: " + str(orders["estimatedTotalAmount"]))
-                        else:
-                            # Handle errors
-                            data = response.json()
-                            if 'Error' in data and 'message' in data["Error"] and data["Error"]["message"] is not None:
-                                print("Error: " + data["Error"]["message"])
-                            else:
-                                print("Error: Preview Order API service error")
-                    else:
-                        # Handle errors
-                        data = response.json()
-                        if 'Error' in data and 'message' in data["Error"] and data["Error"]["message"] is not None:
-                            print("Error: " + data["Error"]["message"])
-                        else:
-                            print("Error: Preview Order API service error")
-                    break
-                elif options_select.isdigit() and int(options_select) == len(prev_orders) + 1:
-                    break
-                else:
-                    print("Unknown Option Selected!")
-
-    @staticmethod
-    def print_orders(response, status):
-        """
-        Formats and displays a list of orders
+        Parses and formats a list of orders
 
         :param response: response object of a list of orders
         :param status: order status related to the response object
-        :return a list of previous orders
+        :return: a list of parsed orders
         """
-        prev_orders = []
+        orders_list = []
         if response is not None and "OrdersResponse" in response and "Order" in response["OrdersResponse"]:
             for order in response["OrdersResponse"]["Order"]:
                 if order is not None and "OrderDetail" in order:
                     for details in order["OrderDetail"]:
                         if details is not None and "Instrument" in details:
                             for instrument in details["Instrument"]:
-                                order_str = ""
-                                order_obj = {"price_type": None,
-                                             "order_term": None,
-                                             "order_indicator": None,
-                                             "order_type": None,
-                                             "security_type": None,
-                                             "symbol": None,
-                                             "order_action": None,
-                                             "quantity": None}
-                                if order is not None and 'orderType' in order:
-                                    order_obj["order_type"] = order["orderType"]
+                                order_obj = {
+                                    "order_id": order.get("orderId"),
+                                    "price_type": details.get("priceType"),
+                                    "order_term": details.get("orderTerm"),
+                                    "order_type": order.get("orderType"),
+                                    "security_type": instrument.get("Product", {}).get("securityType"),
+                                    "symbol": instrument.get("Product", {}).get("symbol"),
+                                    "order_action": instrument.get("orderAction"),
+                                    "quantity": instrument.get("orderedQuantity"),
+                                    "limit_price": details.get("limitPrice"),
+                                    "status": details.get("status")
+                                }
+                                
+                                # Add status-specific fields
+                                if status == "Open":
+                                    order_obj["bid"] = details.get("netBid")
+                                    order_obj["ask"] = details.get("netAsk")
+                                    order_obj["net_price"] = details.get("netPrice")
+                                elif status == "indiv_fills":
+                                    order_obj["filled_quantity"] = instrument.get("filledQuantity")
+                                elif status not in ["open", "expired", "rejected"]:
+                                    order_obj["average_execution_price"] = instrument.get("averageExecutionPrice")
+                                
+                                orders_list.append(order_obj)
+        return orders_list
 
-                                if order is not None and 'orderId' in order:
-                                    order_str += "Order #" + str(order["orderId"]) + " : "
 
-                                if instrument is not None and 'Product' in instrument \
-                                        and 'securityType' in instrument["Product"]:
-                                    order_str += "Type: " + instrument["Product"]["securityType"] + " | "
-                                    order_obj["security_type"] = instrument["Product"]["securityType"]
 
-                                if instrument is not None and 'orderAction' in instrument:
-                                    order_str += "Order Type: " + instrument["orderAction"] + " | "
-                                    order_obj["order_action"] = instrument["orderAction"]
-
-                                if instrument is not None and 'orderedQuantity' in instrument:
-                                    order_str += "Quantity(Exec/Entered): " + str("{:,}".format(instrument["orderedQuantity"])) + " | "
-                                    order_obj["quantity"] = instrument["orderedQuantity"]
-
-                                if instrument is not None and 'Product' in instrument and 'symbol' in instrument["Product"]:
-                                    order_str += "Symbol: " + instrument["Product"]["symbol"] + " | "
-                                    order_obj["symbol"] = instrument["Product"]["symbol"]
-
-                                if details is not None and 'priceType' in details:
-                                    order_str += "Price Type: " + details["priceType"] + " | "
-                                    order_obj["price_type"] = details["priceType"]
-
-                                if details is not None and 'orderTerm' in details:
-                                    order_str += "Term: " + details["orderTerm"] + " | "
-                                    order_obj["order_term"] = details["orderTerm"]
-
-                                if details is not None and 'limitPrice' in details:
-                                    order_str += "Price: " + str('${:,.2f}'.format(details["limitPrice"])) + " | "
-                                    order_obj["limitPrice"] = details["limitPrice"]
-
-                                if status == "Open" and details is not None and 'netBid' in details:
-                                    order_str += "Bid: " + details["netBid"] + " | "
-                                    order_obj["bid"] = details["netBid"]
-
-                                if status == "Open" and details is not None and 'netAsk' in details:
-                                    order_str += "Ask: " + details["netAsk"] + " | "
-                                    order_obj["ask"] = details["netAsk"]
-
-                                if status == "Open" and details is not None and 'netPrice' in details:
-                                    order_str += "Last Price: " + details["netPrice"] + " | "
-                                    order_obj["netPrice"] = details["netPrice"]
-
-                                if status == "indiv_fills" and instrument is not None and 'filledQuantity' in instrument:
-                                    order_str += "Quantity Executed: " + str("{:,}".format(instrument["filledQuantity"])) + " | "
-                                    order_obj["quantity"] = instrument["filledQuantity"]
-
-                                if status != "open" and status != "expired" and status != "rejected" and instrument is not None \
-                                        and "averageExecutionPrice" in instrument:
-                                    order_str += "Price Executed: " + str('${:,.2f}'.format(instrument["averageExecutionPrice"])) + " | "
-
-                                if status != "expired" and status != "rejected" and details is not None and 'status' in details:
-                                    order_str += "Status: " + details["status"]
-
-                                print(order_str)
-                                prev_orders.append(order_obj)
-        return prev_orders
-
-    @staticmethod
-    def options_selection(options):
-        """
-        Formats and displays different options in a menu
-
-        :param options: List of options to display
-        :return the number user selected
-        """
-        while True:
-            print("")
-            for num, price_type in enumerate(options, start=1):
-                print("{})\t{}".format(num, price_type))
-            options_select = input("Please select an option: ")
-            if options_select.isdigit() and 0 < int(options_select) < len(options) + 1:
-                return options_select
-            else:
-                print("Unknown Option Selected!")
-
-    def user_select_order(self):
-        """
-            Provides users options to select to preview orders
-            :param self test
-            :return user's order selections
-            """
-        order = {"price_type": "",
-                 "order_term": "",
-                 "symbol": "",
-                 "order_action": "",
-                 "limit_price":"",
-                 "quantity": ""}
-
-        price_type_options = ["MARKET", "LIMIT"]
-        order_term_options = ["GOOD_FOR_DAY", "IMMEDIATE_OR_CANCEL", "FILL_OR_KILL"]
-        order_action_options = ["BUY", "SELL", "BUY_TO_COVER", "SELL_SHORT"]
-
-        print("\nPrice Type:")
-        order["price_type"] = price_type_options[int(self.options_selection(price_type_options)) - 1]
-
-        if order["price_type"] == "MARKET":
-            order["order_term"] = "GOOD_FOR_DAY"
-        else:
-            print("\nOrder Term:")
-            order["order_term"] = order_term_options[int(self.options_selection(order_term_options)) - 1]
-
-        order["limit_price"] = None
-        if order["price_type"] == "LIMIT":
-            while order["limit_price"] is None or not order["limit_price"].isdigit() \
-                    and not re.match(r'\d+(?:[.]\d{2})?$', order["limit_price"]):
-                order["limit_price"] = input("\nPlease input limit price: ")
-
-        order["client_order_id"] = random.randint(1000000000, 9999999999)
-
-        while order["symbol"] == "":
-            order["symbol"] = input("\nPlease enter a stock symbol :")
-
-        print("\nOrder Action Type:")
-        order["order_action"] = order_action_options[int(self.options_selection(order_action_options)) - 1]
-
-        while not order["quantity"].isdigit():
-            order["quantity"] = input("\nPlease type quantity:")
-
-        return order
-
-    def preview_order_menu(self, session, account, prev_orders):
-        """
-        Provides the different options for preview orders: select new order or select from previous order
-
-        :param session: authenticated session
-        :param account: information on selected account
-        :param prev_orders: list of instruments from previous orders
-        """
-        menu_list = {"1": "Select New Order",
-                     "2": "Select From Previous Orders",
-                     "3": "Go Back"}
-
-        while True:
-            print("")
-            options = menu_list.keys()
-            for entry in options:
-                print(entry + ")\t" + menu_list[entry])
-
-            selection = input("Please select an option: ")
-            if selection == "1":
-                print("\nPreview Order: ")
-                self.preview_order()
-                break
-            elif selection == "2":
-                self.previous_order(session, account, prev_orders)
-                break
-            elif selection == "3":
-                break
-            else:
-                print("Unknown Option Selected!")
-
-    def cancel_order(self):
+    def cancel_order(self, order_id):
         """
         Calls cancel order API to cancel an existing order
-        :param self: Pass parameter with authenticated session and information on selected account
+        
+        :param order_id: The order ID to cancel
+        :return: Dictionary containing cancellation result
         """
-        while True:
-            # Display a list of Open Orders
-            # URL for the API endpoint
-            url = self.base_url + "/v1/accounts/" + self.account["accountIdKey"] + "/orders.json"
+        if not order_id:
+            return {"success": False, "error": "Order ID is required"}
 
-            # Add parameters and header information
-            params_open = {"status": "OPEN"}
-            headers = {"consumerkey": config["DEFAULT"]["CONSUMER_KEY"]}
+        # URL for the API endpoint
+        url = self.base_url + "/v1/accounts/" + self.account["accountIdKey"] + "/orders/cancel.json"
 
-            # Make API call for GET request
-            response_open = self.session.get(url, header_auth=True, params=params_open, headers=headers)
+        # Add parameters and header information
+        headers = {"Content-Type": "application/xml", "consumerKey": config["DEFAULT"]["CONSUMER_KEY"]}
 
-            logger.debug("Request Header: %s", response_open.request.headers)
-            logger.debug("Response Body: %s", response_open.text)
+        # Add payload for POST Request
+        payload = """<CancelOrderRequest>
+                        <orderId>{0}</orderId>
+                    </CancelOrderRequest>
+                   """
+        payload = payload.format(order_id)
 
-            print("\nOpen Orders: ")
-            # Handle and parse response
-            if response_open.status_code == 204:
-                logger.debug(response_open)
-                print("None")
-                menu_items = {"1": "Go Back"}
-                while True:
-                    print("")
-                    options = menu_items.keys()
-                    for entry in options:
-                        print(entry + ")\t" + menu_items[entry])
+        # Add payload for PUT Request
+        response = self.session.put(url, header_auth=True, headers=headers, data=payload)
+        logger.debug("Request Header: %s", response.request.headers)
+        logger.debug("Request payload: %s", payload)
 
-                    selection = input("Please select an option: ")
-                    if selection == "1":
-                        break
-                    else:
-                        print("Unknown Option Selected!")
-                break
-            elif response_open.status_code == 200:
-                parsed = json.loads(response_open.text)
-                logger.debug(json.dumps(parsed, indent=4, sort_keys=True))
-                data = response_open.json()
-
-                order_list = []
-                count = 1
-                if data is not None and "OrdersResponse" in data and "Order" in data["OrdersResponse"]:
-                    for order in data["OrdersResponse"]["Order"]:
-                        if order is not None and "OrderDetail" in order:
-                            for details in order["OrderDetail"]:
-                                if details is not None and "Instrument" in details:
-                                    for instrument in details["Instrument"]:
-                                        order_str = ""
-                                        order_obj = {"price_type": None,
-                                                     "order_term": None,
-                                                     "order_indicator": None,
-                                                     "order_type": None,
-                                                     "security_type": None,
-                                                     "symbol": None,
-                                                     "order_action": None,
-                                                     "quantity": None}
-                                        if order is not None and 'orderType' in order:
-                                            order_obj["order_type"] = order["orderType"]
-
-                                        if order is not None and 'orderId' in order:
-                                            order_str += "Order #" + str(order["orderId"]) + " : "
-                                        if instrument is not None and 'Product' in instrument and 'securityType' \
-                                                in instrument["Product"]:
-                                            order_str += "Type: " + instrument["Product"]["securityType"] + " | "
-                                            order_obj["security_type"] = instrument["Product"]["securityType"]
-
-                                        if instrument is not None and 'orderAction' in instrument:
-                                            order_str += "Order Type: " + instrument["orderAction"] + " | "
-                                            order_obj["order_action"] = instrument["orderAction"]
-
-                                        if instrument is not None and 'orderedQuantity' in instrument:
-                                            order_str += "Quantity(Exec/Entered): " + str(
-                                                "{:,}".format(instrument["orderedQuantity"])) + " | "
-                                            order_obj["quantity"] = instrument["orderedQuantity"]
-
-                                        if instrument is not None and 'Product' in instrument and 'symbol' \
-                                                in instrument["Product"]:
-                                            order_str += "Symbol: " + instrument["Product"]["symbol"] + " | "
-                                            order_obj["symbol"] = instrument["Product"]["symbol"]
-
-                                        if details is not None and 'priceType' in details:
-                                            order_str += "Price Type: " + details["priceType"] + " | "
-                                            order_obj["price_type"] = details["priceType"]
-
-                                        if details is not None and 'orderTerm' in details:
-                                            order_str += "Term: " + details["orderTerm"] + " | "
-                                            order_obj["order_term"] = details["orderTerm"]
-
-                                        if details is not None and 'limitPrice' in details:
-                                            order_str += "Price: " + str(
-                                                '${:,.2f}'.format(details["limitPrice"])) + " | "
-                                            order_obj["limitPrice"] = details["limitPrice"]
-
-                                        if instrument is not None and 'filledQuantity' in instrument:
-                                            order_str += "Quantity Executed: " \
-                                                         + str("{:,}".format(instrument["filledQuantity"])) + " | "
-                                            order_obj["quantity"] = instrument["filledQuantity"]
-
-                                        if instrument is not None and "averageExecutionPrice" in instrument:
-                                            order_str += "Price Executed: " + str(
-                                                '${:,.2f}'.format(instrument["averageExecutionPrice"])) + " | "
-
-                                        if details is not None and 'status' in details:
-                                            order_str += "Status: " + details["status"]
-
-                                        print(str(count) + ")\t" + order_str)
-                                        count = 1 + count
-                                        order_list.append(order["orderId"])
-
-                    print(str(count) + ")\tGo Back")
-                    selection = input("Please select an option: ")
-                    if selection.isdigit() and 0 < int(selection) < len(order_list) + 1:
-                        # URL for the API endpoint
-                        url = self.base_url + "/v1/accounts/" + self.account["accountIdKey"] + "/orders/cancel.json"
-
-                        # Add parameters and header information
-                        headers = {"Content-Type": "application/xml", "consumerKey": config["DEFAULT"]["CONSUMER_KEY"]}
-
-                        # Add payload for POST Request
-                        payload = """<CancelOrderRequest>
-                                        <orderId>{0}</orderId>
-                                    </CancelOrderRequest>
-                                   """
-                        payload = payload.format(order_list[int(selection) - 1])
-
-                        # Add payload for PUT Request
-                        response = self.session.put(url, header_auth=True, headers=headers, data=payload)
-                        logger.debug("Request Header: %s", response.request.headers)
-                        logger.debug("Request payload: %s", payload)
-
-                        # Handle and parse response
-                        if response is not None and response.status_code == 200:
-                            parsed = json.loads(response.text)
-                            logger.debug("Response Body: %s", json.dumps(parsed, indent=4, sort_keys=True))
-                            data = response.json()
-                            if data is not None and "CancelOrderResponse" in data \
-                                    and "orderId" in data["CancelOrderResponse"]:
-                                print("\nOrder number #" + str(
-                                    data["CancelOrderResponse"]["orderId"]) + " successfully Cancelled.")
-                            else:
-                                # Handle errors
-                                logger.debug("Response Headers: %s", response.headers)
-                                logger.debug("Response Body: %s", response.text)
-                                data = response.json()
-                                if 'Error' in data and 'message' in data["Error"] \
-                                        and data["Error"]["message"] is not None:
-                                    print("Error: " + data["Error"]["message"])
-                                else:
-                                    print("Error: Cancel Order API service error")
-                        else:
-                            # Handle errors
-                            logger.debug("Response Headers: %s", response.headers)
-                            logger.debug("Response Body: %s", response.text)
-                            data = response.json()
-                            if 'Error' in data and 'message' in data["Error"] and data["Error"]["message"] is not None:
-                                print("Error: " + data["Error"]["message"])
-                            else:
-                                print("Error: Cancel Order API service error")
-                        break
-
-                    elif selection.isdigit() and int(selection) == len(order_list) + 1:
-                        break
-                    else:
-                        print("Unknown Option Selected!")
-                else:
-                    # Handle errors
-                    logger.debug("Response Body: %s", response_open.text)
-                    if response_open is not None and response_open.headers['Content-Type'] == 'application/json' \
-                            and "Error" in response_open.json() and "message" in response_open.json()["Error"] \
-                            and response_open.json()["Error"]["message"] is not None:
-                        print("Error: " + response_open.json()["Error"]["message"])
-                    else:
-                        print("Error: Balance API service error")
-                    break
+        # Handle and parse response
+        if response is not None and response.status_code == 200:
+            parsed = json.loads(response.text)
+            logger.debug("Response Body: %s", json.dumps(parsed, indent=4, sort_keys=True))
+            data = response.json()
+            if data is not None and "CancelOrderResponse" in data \
+                    and "orderId" in data["CancelOrderResponse"]:
+                return {
+                    "success": True,
+                    "cancelled_order_id": data["CancelOrderResponse"]["orderId"],
+                    "message": f"Order #{data['CancelOrderResponse']['orderId']} successfully cancelled"
+                }
             else:
                 # Handle errors
-                logger.debug("Response Body: %s", response_open.text)
-                if response_open is not None and response_open.headers['Content-Type'] == 'application/json' \
-                        and "Error" in response_open.json() and "message" in response_open.json()["Error"] \
-                        and response_open.json()["Error"]["message"] is not None:
-                    print("Error: " + response_open.json()["Error"]["message"])
-                else:
-                    print("Error: Balance API service error")
-                break
+                logger.debug("Response Headers: %s", response.headers)
+                logger.debug("Response Body: %s", response.text)
+                data = response.json()
+                error_msg = "Cancel Order API service error"
+                if 'Error' in data and 'message' in data["Error"] \
+                        and data["Error"]["message"] is not None:
+                    error_msg = data["Error"]["message"]
+                return {"success": False, "error": error_msg}
+        else:
+            # Handle errors
+            logger.debug("Response Headers: %s", response.headers)
+            logger.debug("Response Body: %s", response.text)
+            data = response.json()
+            error_msg = "Cancel Order API service error"
+            if 'Error' in data and 'message' in data["Error"] and data["Error"]["message"] is not None:
+                error_msg = data["Error"]["message"]
+            return {"success": False, "error": error_msg}
 
     def view_orders(self):
         """
         Calls orders API to provide the details for the orders
 
-        :param self: Pass in authenticated session and information on selected account
+        :return: Dictionary containing orders data organized by status
         """
-        while True:
-            # URL for the API endpoint
-            url = self.base_url + "/v1/accounts/" + self.account["accountIdKey"] + "/orders.json"
+        # URL for the API endpoint
+        url = self.base_url + "/v1/accounts/" + self.account["accountIdKey"] + "/orders.json"
 
-            # Add parameters and header information
-            headers = {"consumerkey": config["DEFAULT"]["CONSUMER_KEY"]}
-            params_open = {"status": "OPEN"}
-            params_executed = {"status": "EXECUTED"}
-            params_indiv_fills = {"status": "INDIVIDUAL_FILLS"}
-            params_cancelled = {"status": "CANCELLED"}
-            params_rejected = {"status": "REJECTED"}
-            params_expired = {"status": "EXPIRED"}
+        # Add parameters and header information
+        headers = {"consumerkey": config["DEFAULT"]["CONSUMER_KEY"]}
+        params_open = {"status": "OPEN"}
+        params_executed = {"status": "EXECUTED"}
+        params_indiv_fills = {"status": "INDIVIDUAL_FILLS"}
+        params_cancelled = {"status": "CANCELLED"}
+        params_rejected = {"status": "REJECTED"}
+        params_expired = {"status": "EXPIRED"}
 
-            # Make API call for GET request
-            response_open = self.session.get(url, header_auth=True, params=params_open, headers=headers)
-            response_executed = self.session.get(url, header_auth=True, params=params_executed, headers=headers)
-            response_indiv_fills = self.session.get(url, header_auth=True, params=params_indiv_fills, headers=headers)
-            response_cancelled = self.session.get(url, header_auth=True, params=params_cancelled, headers=headers)
-            response_rejected = self.session.get(url, header_auth=True, params=params_rejected, headers=headers)
-            response_expired = self.session.get(url, header_auth=True, params=params_expired, headers=headers)
+        # Make API call for GET request
+        response_open = self.session.get(url, header_auth=True, params=params_open, headers=headers)
+        response_executed = self.session.get(url, header_auth=True, params=params_executed, headers=headers)
+        response_indiv_fills = self.session.get(url, header_auth=True, params=params_indiv_fills, headers=headers)
+        response_cancelled = self.session.get(url, header_auth=True, params=params_cancelled, headers=headers)
+        response_rejected = self.session.get(url, header_auth=True, params=params_rejected, headers=headers)
+        response_expired = self.session.get(url, header_auth=True, params=params_expired, headers=headers)
 
-            prev_orders = []
+        result = {
+            "open_orders": [],
+            "executed_orders": [],
+            "individual_fills_orders": [],
+            "cancelled_orders": [],
+            "rejected_orders": [],
+            "expired_orders": []
+        }
 
-            # Open orders
-            logger.debug("Request Header: %s", response_open.request.headers)
-            logger.debug("Response Body: %s", response_open.text)
+        # Open orders
+        logger.debug("Request Header: %s", response_open.request.headers)
+        logger.debug("Response Body: %s", response_open.text)
 
-            print("\nOpen Orders:")
-            # Handle and parse response
-            if response_open.status_code == 204:
-                logger.debug(response_open)
-                print("None")
-            elif response_open.status_code == 200:
-                parsed = json.loads(response_open.text)
-                logger.debug(json.dumps(parsed, indent=4, sort_keys=True))
-                data = response_open.json()
+        if response_open.status_code == 200:
+            parsed = json.loads(response_open.text)
+            logger.debug(json.dumps(parsed, indent=4, sort_keys=True))
+            data = response_open.json()
+            result["open_orders"] = self.parse_orders(data, "open")
 
-                # Display list of open orders
-                prev_orders.extend(self.print_orders(data, "open"))
+        # Executed orders
+        logger.debug("Request Header: %s", response_executed.request.headers)
+        logger.debug("Response Body: %s", response_executed.text)
 
-            # Executed orders
-            logger.debug("Request Header: %s", response_executed.request.headers)
-            logger.debug("Response Body: %s", response_executed.text)
-            logger.debug(response_executed.text)
+        if response_executed.status_code == 200:
+            parsed = json.loads(response_executed.text)
+            logger.debug(json.dumps(parsed, indent=4, sort_keys=True))
+            data = response_executed.json()
+            result["executed_orders"] = self.parse_orders(data, "executed")
 
-            print("\nExecuted Orders:")
-            # Handle and parse response
-            if response_executed.status_code == 204:
-                logger.debug(response_executed)
-                print("None")
-            elif response_executed.status_code == 200:
-                parsed = json.loads(response_executed.text)
-                logger.debug(json.dumps(parsed, indent=4, sort_keys=True))
-                data = response_executed.json()
+        # Individual fills orders
+        logger.debug("Request Header: %s", response_indiv_fills.request.headers)
+        logger.debug("Response Body: %s", response_indiv_fills.text)
 
-                # Display list of executed orders
-                prev_orders.extend(self.print_orders(data, "executed"))
+        if response_indiv_fills.status_code == 200:
+            parsed = json.loads(response_indiv_fills.text)
+            logger.debug("Response Body: %s", json.dumps(parsed, indent=4, sort_keys=True))
+            data = response_indiv_fills.json()
+            result["individual_fills_orders"] = self.parse_orders(data, "indiv_fills")
 
-            # Individual fills orders
-            logger.debug("Request Header: %s", response_indiv_fills.request.headers)
-            logger.debug("Response Body: %s", response_indiv_fills.text)
+        # Cancelled orders
+        logger.debug("Request Header: %s", response_cancelled.request.headers)
+        logger.debug("Response Body: %s", response_cancelled.text)
 
-            print("\nIndividual Fills Orders:")
-            # Handle and parse response
-            if response_indiv_fills.status_code == 204:
-                logger.debug("Response Body: %s", response_indiv_fills)
-                print("None")
-            elif response_indiv_fills.status_code == 200:
-                parsed = json.loads(response_indiv_fills.text)
-                logger.debug("Response Body: %s", json.dumps(parsed, indent=4, sort_keys=True))
-                data = response_indiv_fills.json()
+        if response_cancelled.status_code == 200:
+            parsed = json.loads(response_cancelled.text)
+            logger.debug(json.dumps(parsed, indent=4, sort_keys=True))
+            data = response_cancelled.json()
+            result["cancelled_orders"] = self.parse_orders(data, "cancelled")
 
-                # Display list of individual fills orders
-                prev_orders.extend(self.print_orders(data, "indiv_fills"))
+        # Rejected orders
+        logger.debug("Request Header: %s", response_rejected.request.headers)
+        logger.debug("Response Body: %s", response_rejected.text)
 
-            # Cancelled orders
-            logger.debug("Request Header: %s", response_cancelled.request.headers)
-            logger.debug("Response Body: %s", response_cancelled.text)
+        if response_rejected.status_code == 200:
+            parsed = json.loads(response_rejected.text)
+            logger.debug(json.dumps(parsed, indent=4, sort_keys=True))
+            data = response_rejected.json()
+            result["rejected_orders"] = self.parse_orders(data, "rejected")
 
-            print("\nCancelled Orders:")
-            # Handle and parse response
-            if response_cancelled.status_code == 204:
-                logger.debug(response_cancelled)
-                print("None")
-            elif response_cancelled.status_code == 200:
-                parsed = json.loads(response_cancelled.text)
-                logger.debug(json.dumps(parsed, indent=4, sort_keys=True))
-                data = response_cancelled.json()
+        # Expired orders
+        if response_expired.status_code == 200:
+            parsed = json.loads(response_expired.text)
+            logger.debug(json.dumps(parsed, indent=4, sort_keys=True))
+            data = response_expired.json()
+            result["expired_orders"] = self.parse_orders(data, "expired")
 
-                # Display list of open orders
-                prev_orders.extend(self.print_orders(data, "cancelled"))
-
-            # Rejected orders
-            logger.debug("Request Header: %s", response_rejected.request.headers)
-            logger.debug("Response Body: %s", response_rejected.text)
-
-            print("\nRejected Orders:")
-            # Handle and parse response
-            if response_rejected.status_code == 204:
-                logger.debug(response_rejected)
-                print("None")
-            elif response_rejected.status_code == 200:
-                parsed = json.loads(response_rejected.text)
-                logger.debug(json.dumps(parsed, indent=4, sort_keys=True))
-                data = response_rejected.json()
-
-                # Display list of open orders
-                prev_orders.extend(self.print_orders(data, "rejected"))
-
-            # Expired orders
-            print("\nExpired Orders:")
-            # Handle and parse response
-            if response_expired.status_code == 204:
-                logger.debug(response_executed)
-                print("None")
-            elif response_expired.status_code == 200:
-                parsed = json.loads(response_expired.text)
-                logger.debug(json.dumps(parsed, indent=4, sort_keys=True))
-                data = response_expired.json()
-
-                # Display list of open orders
-                prev_orders.extend(self.print_orders(data, "expired"))
-
-            menu_list = {"1": "Preview Order",
-                         "2": "Cancel Order",
-                         "3": "Go Back"}
-
-            print("")
-            options = menu_list.keys()
-            for entry in options:
-                print(entry + ")\t" + menu_list[entry])
-
-            selection = input("Please select an option: ")
-            if selection == "1":
-                self.preview_order_menu(self.session, self.account, prev_orders)
-            elif selection == "2":
-                self.cancel_order()
-            elif selection == "3":
-                break
-            else:
-                print("Unknown Option Selected!")
+        return result
