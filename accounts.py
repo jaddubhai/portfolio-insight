@@ -35,7 +35,7 @@ class Accounts:
         """
         Calls account list API to retrieve a list of the user's E*TRADE accounts
 
-        :param self:Passes in parameter authenticated session
+        :return: Dictionary containing success status and accounts data or error information
         """
 
         url = self.base_url + "/v1/accounts/list.json"
@@ -57,7 +57,7 @@ class Accounts:
                 and "Account" in data["AccountListResponse"]["Accounts"]
             ):
                 accounts = data["AccountListResponse"]["Accounts"]["Account"]
-                return accounts
+                return {"success": True, "accounts": accounts}
             else:
                 logger.debug("Response Body: %s", response.text)
                 if (
@@ -67,9 +67,9 @@ class Accounts:
                     and "message" in response.json()["Error"]
                     and response.json()["Error"]["message"] is not None
                 ):
-                    print("Error: " + data["Error"]["message"])
+                    return {"success": False, "error": data["Error"]["message"]}
                 else:
-                    print("Error: AccountList API service error")
+                    return {"success": False, "error": "AccountList API service error"}
         else:
             logger.debug("Response Body: %s", response.text)
             if (
@@ -79,16 +79,22 @@ class Accounts:
                 and "message" in response.json()["Error"]
                 and response.json()["Error"]["message"] is not None
             ):
-                print("Error: " + response.json()["Error"]["message"])
+                return {"success": False, "error": response.json()["Error"]["message"]}
             else:
-                print("Error: AccountList API service error")
+                return {"success": False, "error": "AccountList API service error"}
 
     def portfolio(self):
         """
         Call portfolio API to retrieve a list of positions held in the specified account
 
-        :param self: Passes in parameter authenticated session and information on selected account
+        :return: Dictionary containing success status and portfolio positions or error information
         """
+        if not self.account or "accountIdKey" not in self.account:
+            return {
+                "success": False,
+                "error": "Account not selected. Please set account first.",
+            }
+
         url = (
             self.base_url
             + "/v1/accounts/"
@@ -137,8 +143,20 @@ class Accounts:
                                 cleaned_position["market_value"] = position[
                                     "marketValue"
                                 ]
+                            # Add additional position details if available
+                            if position is not None and "Product" in position:
+                                product = position["Product"]
+                                if "securityType" in product:
+                                    cleaned_position["security_type"] = product[
+                                        "securityType"
+                                    ]
+                                if "symbol" in product:
+                                    cleaned_position["product_symbol"] = product[
+                                        "symbol"
+                                    ]
+
                             positions_list.append(cleaned_position)
-                return positions_list
+                return {"success": True, "positions": positions_list}
             else:
                 logger.debug("Response Body: %s", response.text)
                 if (
@@ -150,9 +168,12 @@ class Accounts:
                     and "message" in response.json()["Error"]
                     and response.json()["Error"]["message"] is not None
                 ):
-                    print("Error: " + response.json()["Error"]["message"])
+                    return {
+                        "success": False,
+                        "error": response.json()["Error"]["message"],
+                    }
                 else:
-                    print("Error: Portfolio API service error")
+                    return {"success": False, "error": "Portfolio API service error"}
         else:
             logger.debug("Response Body: %s", response.text)
             if (
@@ -164,16 +185,21 @@ class Accounts:
                 and "message" in response.json()["Error"]
                 and response.json()["Error"]["message"] is not None
             ):
-                print("Error: " + response.json()["Error"]["message"])
+                return {"success": False, "error": response.json()["Error"]["message"]}
             else:
-                print("Error: Portfolio API service error")
+                return {"success": False, "error": "Portfolio API service error"}
 
     def balance(self):
         """
         Calls account balance API to retrieve the current balance and related details for a specified account
 
-        :param self: Pass in parameters authenticated session and information on selected account
+        :return: Dictionary containing success status and balance information or error information
         """
+        if not self.account or "accountIdKey" not in self.account:
+            return {
+                "success": False,
+                "error": "Account not selected. Please set account first.",
+            }
 
         url = (
             self.base_url
@@ -216,7 +242,7 @@ class Accounts:
                         result["marginBuyingPower"] = computed["marginBuyingPower"]
                     if "cashBuyingPower" in computed:
                         result["cashBuyingPower"] = computed["cashBuyingPower"]
-                return result
+                return {"success": True, "balance": result}
             else:
                 logger.debug("Response Body: %s", response.text)
                 if (
@@ -226,9 +252,12 @@ class Accounts:
                     and "message" in response.json()["Error"]
                     and response.json()["Error"]["message"] is not None
                 ):
-                    print("Error: " + response.json()["Error"]["message"])
+                    return {
+                        "success": False,
+                        "error": response.json()["Error"]["message"],
+                    }
                 else:
-                    print("Error: Balance API service error")
+                    return {"success": False, "error": "Balance API service error"}
         else:
             logger.debug("Response Body: %s", response.text)
             if (
@@ -238,9 +267,89 @@ class Accounts:
                 and "message" in response.json()["Error"]
                 and response.json()["Error"]["message"] is not None
             ):
-                print("Error: " + response.json()["Error"]["message"])
+                return {"success": False, "error": response.json()["Error"]["message"]}
             else:
-                print("Error: Balance API service error")
+                return {"success": False, "error": "Balance API service error"}
+
+    def set_account(self, account_data):
+        """
+        Set the current account for portfolio and balance operations
+
+        :param account_data: Dictionary containing account information
+        :return: Dictionary containing success status
+        """
+        if not account_data:
+            return {"success": False, "error": "Account data is required"}
+
+        required_fields = ["accountIdKey", "institutionType"]
+        for field in required_fields:
+            if field not in account_data:
+                return {"success": False, "error": f"Missing required field: {field}"}
+
+        self.account = account_data
+        return {"success": True, "message": "Account set successfully"}
+
+    def get_account_summary(self):
+        """
+        Get a comprehensive summary of the current account including balance and portfolio
+
+        :return: Dictionary containing account summary or error information
+        """
+        if not self.account:
+            return {
+                "success": False,
+                "error": "Account not selected. Please set account first.",
+            }
+
+        # Get balance information
+        balance_result = self.balance()
+        if not balance_result["success"]:
+            return balance_result
+
+        # Get portfolio information
+        portfolio_result = self.portfolio()
+        if not portfolio_result["success"]:
+            return portfolio_result
+
+        # Calculate portfolio summary statistics
+        positions = portfolio_result["positions"]
+        portfolio_summary = {
+            "total_positions": len(positions),
+            "total_market_value": sum(pos.get("market_value", 0) for pos in positions),
+            "total_gain_loss": sum(pos.get("total_gain", 0) for pos in positions),
+            "positions_with_gains": len(
+                [pos for pos in positions if pos.get("total_gain", 0) > 0]
+            ),
+            "positions_with_losses": len(
+                [pos for pos in positions if pos.get("total_gain", 0) < 0]
+            ),
+        }
+
+        return {
+            "success": True,
+            "account_summary": {
+                "account_info": {
+                    "account_id": balance_result["balance"].get("accountId"),
+                    "account_description": balance_result["balance"].get(
+                        "accountDescription"
+                    ),
+                },
+                "balance": balance_result["balance"],
+                "portfolio_summary": portfolio_summary,
+                "positions": positions,
+            },
+        }
+
+    def get_account_info(self):
+        """
+        Get basic information about the currently selected account
+
+        :return: Dictionary containing account information or error
+        """
+        if not self.account:
+            return {"success": False, "error": "No account selected"}
+
+        return {"success": True, "account": self.account}
 
 
 if __name__ == "__main__":
