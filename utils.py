@@ -59,12 +59,12 @@ def oauth(key_type: KeyType = KeyType.SANDBOX):
 
 
 def account_instance(base_url: str, session):
-    return Accounts(base_url, session)
+    return Accounts(session, base_url)
 
 
 def market_instance(base_url: str, session):
-    return Market(base_url, session)
+    return Market(session, base_url)
 
 
 def order_instance(base_url: str, session):
-    return Order(base_url, session)
+    return Order(session, base_url)
