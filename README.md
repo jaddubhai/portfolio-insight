@@ -1,4 +1,7 @@
 # (WIP) portfolio-insight
+
+![CI](https://github.com/jaddubhai/portfolio-insight/workflows/CI/badge.svg)
+
 Based on etrade Python SDK. The app has 2 modules:
 Module 1:
 - Takes in a target portfolio allocation (either via text input, or an image of a portfolio)
@@ -65,3 +68,36 @@ To run hooks manually on all files:
 ```bash
 pre-commit run --all-files
 ```
+
+### Testing
+
+The project includes comprehensive tests for the portfolio allocation functionality.
+
+#### Running Tests
+
+To run all tests:
+```bash
+python run_tests.py
+```
+
+Or run individual test files:
+```bash
+python tests/test_allocation.py
+python tests/test_allocation_service.py
+```
+
+#### Test Structure
+
+- `tests/test_allocation.py` - Tests for the core allocation calculation functions
+- `tests/test_allocation_service.py` - Tests for the AllocationService class and end-to-end workflows
+
+#### Continuous Integration
+
+GitHub Actions automatically runs tests on all pull requests and pushes to the main branch. The CI pipeline:
+
+- Tests on Python 3.8, 3.9, 3.10, 3.11, and 3.12
+- Checks code formatting with Black
+- Runs the complete test suite
+- Ensures all pre-commit hooks pass
+
+All tests must pass before a pull request can be merged.
