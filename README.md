@@ -30,14 +30,10 @@ portfolio-insight/
 │   │   ├── __init__.py
 │   │   ├── allocation.py      # Investment allocation logic
 │   │   └── backtest.py        # Portfolio backtesting
-│   ├── ui/                    # User interface modules
-│   │   ├── __init__.py
-│   │   ├── anvil_app.py
-│   │   ├── module1_form.py
-│   │   └── module2_form.py
 │   └── llm/                   # LLM integration
 │       ├── __init__.py
 │       └── chat.py
+├── ui/                        # React-based user interface (separate from Python package)
 ├── tests/                     # Test package
 │   ├── __init__.py
 │   ├── test_allocation.py
