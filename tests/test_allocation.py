@@ -26,7 +26,9 @@ def test_basic_allocation():
     assert isinstance(result, dict), "Result should be a dictionary"
     # Check that all recommendations are non-negative integers
     for security, shares in result.items():
-        assert security in target_allocation, f"Security {security} not in target allocation"
+        assert (
+            security in target_allocation
+        ), f"Security {security} not in target allocation"
         assert isinstance(shares, int), f"Shares should be integer, got {type(shares)}"
         assert shares >= 0, f"Shares should be non-negative, got {shares}"
     print("✓ Basic allocation test passed")
@@ -51,8 +53,12 @@ def test_empty_portfolio():
     # GOOGL gets 40% of $1000 = $400 = 2 shares at $200
     expected_aapl_shares = int(600 / 150)  # 4 shares
     expected_googl_shares = int(400 / 200)  # 2 shares
-    assert result.get("AAPL", 0) == expected_aapl_shares, f"Expected {expected_aapl_shares} AAPL shares, got {result.get('AAPL', 0)}"
-    assert result.get("GOOGL", 0) == expected_googl_shares, f"Expected {expected_googl_shares} GOOGL shares, got {result.get('GOOGL', 0)}"
+    assert (
+        result.get("AAPL", 0) == expected_aapl_shares
+    ), f"Expected {expected_aapl_shares} AAPL shares, got {result.get('AAPL', 0)}"
+    assert (
+        result.get("GOOGL", 0) == expected_googl_shares
+    ), f"Expected {expected_googl_shares} GOOGL shares, got {result.get('GOOGL', 0)}"
     print("✓ Empty portfolio test passed")
 
 
@@ -96,7 +102,9 @@ def test_underallocated_security():
     # Only AAPL should be recommended
     assert "AAPL" in result, "AAPL should be recommended"
     assert result.get("AAPL", 0) > 0, "AAPL should get positive shares"
-    assert result.get("GOOGL", 0) == 0, "GOOGL should not be recommended (overallocated)"
+    assert (
+        result.get("GOOGL", 0) == 0
+    ), "GOOGL should not be recommended (overallocated)"
     print("✓ Underallocated security test passed")
 
 
@@ -129,29 +137,35 @@ def test_proportional_allocation():
 
     print(f"Proportional allocation test: {result}")
     assert isinstance(result, dict), "Result should be a dictionary"
-    
+
     # With empty portfolio, gaps are equal to target allocations
     # AAPL: 50% * $1000 = $500 = 5 shares at $100
-    # GOOGL: 30% * $1000 = $300 = 1 share at $200 
+    # GOOGL: 30% * $1000 = $300 = 1 share at $200
     # MSFT: 20% * $1000 = $200 = 4 shares at $50
     expected = {"AAPL": 5, "GOOGL": 1, "MSFT": 4}
-    
+
     for security, expected_shares in expected.items():
-        assert result.get(security, 0) == expected_shares, f"Expected {expected_shares} {security} shares, got {result.get(security, 0)}"
-    
+        assert (
+            result.get(security, 0) == expected_shares
+        ), f"Expected {expected_shares} {security} shares, got {result.get(security, 0)}"
+
     print("✓ Proportional allocation test passed")
 
 
 def test_invalid_inputs():
     """Test with invalid inputs."""
     current_prices = {"AAPL": 150.0}
-    
+
     # Test with empty target allocation
-    result = calculate_investment_allocation({}, 1000.0, {"AAPL": 500.0}, current_prices)
+    result = calculate_investment_allocation(
+        {}, 1000.0, {"AAPL": 500.0}, current_prices
+    )
     assert result == {}, "Should return empty dict for empty target"
 
     # Test with negative investment amount
-    result = calculate_investment_allocation({"AAPL": 1.0}, -100.0, {"AAPL": 500.0}, current_prices)
+    result = calculate_investment_allocation(
+        {"AAPL": 1.0}, -100.0, {"AAPL": 500.0}, current_prices
+    )
     assert result == {}, "Should return empty dict for negative investment"
 
     print("✓ Invalid inputs test passed")
@@ -170,7 +184,7 @@ def test_balanced_portfolio():
 
     print(f"Balanced portfolio test: {result}")
     assert isinstance(result, dict), "Result should be a dictionary"
-    
+
     # Current total: 1000, Future total: 2000
     # Both securities need to maintain their proportion with new money
     # AAPL target: 60% of 2000 = 1200, current: 600, gap: 600/2000 = 0.3
@@ -179,10 +193,12 @@ def test_balanced_portfolio():
     # AAPL: $600 = 4 shares at $150
     # GOOGL: $400 = 2 shares at $200
     expected = {"AAPL": 4, "GOOGL": 2}
-    
+
     for security, expected_shares in expected.items():
-        assert result.get(security, 0) == expected_shares, f"Expected {expected_shares} {security} shares, got {result.get(security, 0)}"
-    
+        assert (
+            result.get(security, 0) == expected_shares
+        ), f"Expected {expected_shares} {security} shares, got {result.get(security, 0)}"
+
     print("✓ Balanced portfolio test passed")
 
 
