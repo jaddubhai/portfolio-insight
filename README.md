@@ -1,4 +1,7 @@
 # (WIP) portfolio-insight
+
+![CI](https://github.com/jaddubhai/portfolio-insight/workflows/CI/badge.svg)
+
 Based on etrade Python SDK. The app has 2 modules:
 Module 1:
 - Takes in a target portfolio allocation (either via text input, or an image of a portfolio)
