@@ -1,7 +1,7 @@
 import json
 import logging
 import configparser
-import utils
+from . import utils
 from logging.handlers import RotatingFileHandler
 
 # loading configuration file
