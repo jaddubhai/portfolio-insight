@@ -7,9 +7,8 @@ from dateutil.relativedelta import relativedelta
 import pandas as pd
 import numpy as np
 
-# Add parent directory to path for importing utils
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import utils
+# Import utils from the parent package
+from .. import utils
 
 try:
     from alpaca.data.historical import StockHistoricalDataClient

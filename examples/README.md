@@ -39,8 +39,8 @@ To use the BacktestService with real data:
 
 2. **Set up BacktestService**
    ```python
-   from portfolio.backtest import BacktestService
-   from portfolio.allocation import AllocationService
+   from portfolio_insight.portfolio.backtest import BacktestService
+   from portfolio_insight.portfolio.allocation import AllocationService
    
    # Initialize services
    allocation_service = AllocationService()

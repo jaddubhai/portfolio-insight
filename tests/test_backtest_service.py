@@ -11,7 +11,7 @@ import numpy as np
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from portfolio.backtest import (
+from portfolio_insight.portfolio.backtest import (
     BacktestService,
     BacktestPeriod,
     calculate_cagr,
@@ -112,8 +112,8 @@ class TestBacktestService:
         assert self.service.allocation_service == self.mock_allocation_service
         print("✓ Set allocation service test passed")
 
-    @patch("portfolio.backtest.ALPACA_AVAILABLE", True)
-    @patch("portfolio.backtest.StockHistoricalDataClient")
+    @patch("portfolio_insight.portfolio.backtest.ALPACA_AVAILABLE", True)
+    @patch("portfolio_insight.portfolio.backtest.StockHistoricalDataClient")
     def test_set_alpaca_credentials_success(self, mock_client_class):
         """Test successful Alpaca credentials setup."""
         mock_client = Mock()
@@ -127,7 +127,7 @@ class TestBacktestService:
         mock_client_class.assert_called_once_with("test_key", "test_secret")
         print("✓ Set Alpaca credentials success test passed")
 
-    @patch("portfolio.backtest.ALPACA_AVAILABLE", False)
+    @patch("portfolio_insight.portfolio.backtest.ALPACA_AVAILABLE", False)
     def test_set_alpaca_credentials_no_library(self):
         """Test Alpaca credentials setup when library is not available."""
         result = self.service.set_alpaca_credentials("test_key", "test_secret")

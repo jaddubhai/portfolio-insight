@@ -19,8 +19,8 @@ from unittest.mock import Mock
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from portfolio.backtest import BacktestService, BacktestPeriod
-from portfolio.allocation import AllocationService
+from portfolio_insight.portfolio.backtest import BacktestService, BacktestPeriod
+from portfolio_insight.portfolio.allocation import AllocationService
 
 
 def create_mock_allocation_service():
