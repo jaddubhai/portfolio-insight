@@ -11,7 +11,7 @@ This document summarizes the GitHub Actions CI pipeline that has been implemente
 The CI pipeline includes:
 
 - **Multi-version testing**: Tests on Python 3.8, 3.9, 3.10, 3.11, and 3.12
-- **Dependency management**: Automatically installs from `requirements.txt`
+- **Package installation**: Installs the package in development mode with `pip install -e .`
 - **Code formatting**: Enforces Black code style
 - **Test execution**: Runs all existing tests
 - **Pre-commit validation**: Ensures hooks pass

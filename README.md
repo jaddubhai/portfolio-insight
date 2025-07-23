@@ -60,14 +60,6 @@ portfolio-insight/
    cd portfolio-insight
    ```
 
-### Installation
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/jaddubhai/portfolio-insight.git
-   cd portfolio-insight
-   ```
-
 2. Install the package in development mode:
    ```bash
    pip install -e .
@@ -103,19 +95,6 @@ recommendations = calculate_investment_allocation(
     target_allocation, investment_amount, current_allocation, current_prices
 )
 ```
-
-### Running Tests
-
-Run the test suite:
-```bash
-python tests/test_allocation.py
-python tests/test_allocation_service.py
-```
-
-3. Set up pre-commit hooks:
-   ```bash
-   pre-commit install
-   ```
 
 ### Code Formatting
 
