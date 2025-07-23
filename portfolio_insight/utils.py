@@ -4,9 +4,9 @@ import configparser
 from enum import Enum
 from rauth import OAuth1Service
 
-from accounts import Accounts
-from market import Market
-from order import Order
+from .accounts import Accounts
+from .market import Market
+from .order import Order
 
 
 class KeyType(Enum):
