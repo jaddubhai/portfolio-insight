@@ -1,11 +1,7 @@
 from typing import Dict, Optional, List, Any
 import math
-import sys
-import os
 
-# Add parent directory to path for importing utils
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import utils
+from .. import utils
 
 
 def calculate_investment_allocation(

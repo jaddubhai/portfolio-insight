@@ -590,15 +590,21 @@ class Order:
                                     "average_execution_price": instrument.get(
                                         "averageExecutionPrice"
                                     ),
-                                    "bid": details.get("netBid")
-                                    if status == "open"
-                                    else None,
-                                    "ask": details.get("netAsk")
-                                    if status == "open"
-                                    else None,
-                                    "net_price": details.get("netPrice")
-                                    if status == "open"
-                                    else None,
+                                    "bid": (
+                                        details.get("netBid")
+                                        if status == "open"
+                                        else None
+                                    ),
+                                    "ask": (
+                                        details.get("netAsk")
+                                        if status == "open"
+                                        else None
+                                    ),
+                                    "net_price": (
+                                        details.get("netPrice")
+                                        if status == "open"
+                                        else None
+                                    ),
                                 }
 
                                 # Extract product information
