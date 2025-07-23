@@ -3,12 +3,7 @@
 Test suite for the calculate_investment_allocation function.
 """
 
-import sys
-import os
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from portfolio.allocation import calculate_investment_allocation
+from portfolio_insight.portfolio.allocation import calculate_investment_allocation
 
 
 def test_basic_allocation():

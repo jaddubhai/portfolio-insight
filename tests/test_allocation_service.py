@@ -3,14 +3,13 @@
 Test suite for the AllocationService class.
 """
 
-import sys
-import os
 from unittest.mock import Mock, patch, MagicMock
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from portfolio.allocation import AllocationService, calculate_investment_allocation
-import utils
+from portfolio_insight.portfolio.allocation import (
+    AllocationService,
+    calculate_investment_allocation,
+)
+from portfolio_insight import utils
 
 
 class TestAllocationService:
@@ -36,9 +35,9 @@ class TestAllocationService:
         assert service.current_account is None
         print("✓ Initialization test passed")
 
-    @patch("utils.oauth")
-    @patch("utils.account_instance")
-    @patch("utils.market_instance")
+    @patch("portfolio_insight.utils.oauth")
+    @patch("portfolio_insight.utils.account_instance")
+    @patch("portfolio_insight.utils.market_instance")
     def test_start_session_success(
         self, mock_market_instance, mock_account_instance, mock_oauth
     ):
@@ -69,7 +68,7 @@ class TestAllocationService:
         )
         print("✓ Start session success test passed")
 
-    @patch("utils.oauth")
+    @patch("portfolio_insight.utils.oauth")
     def test_start_session_failure(self, mock_oauth):
         """Test session start failure."""
         # Setup mock to raise exception
@@ -341,9 +340,11 @@ def test_end_to_end_flow_simulation():
     service = AllocationService()
 
     # Mock the entire flow without actual API calls
-    with patch("utils.oauth") as mock_oauth, patch(
-        "utils.account_instance"
-    ) as mock_account_instance, patch("utils.market_instance") as mock_market_instance:
+    with patch("portfolio_insight.utils.oauth") as mock_oauth, patch(
+        "portfolio_insight.utils.account_instance"
+    ) as mock_account_instance, patch(
+        "portfolio_insight.utils.market_instance"
+    ) as mock_market_instance:
 
         # Setup mocks
         mock_session = Mock()
